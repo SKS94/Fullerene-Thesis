@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Oct 16 18:35:00 2020
+
+@author: simon
+"""
+import numpy as np;     import os.path
+from untitled0 import Mesh_quadruple;   import FEM.FEM_Assembly as FEM_Assembly
+from scipy.sparse import linalg    #from scipy import linalg
+
+def full_integration(v_h, quad_coor, quad_weights, triangulation, basis):
+    from FEM.UnitCell_Computations import UnitCell
+    full_integral = 0
+    tri_glo = basis.GlobalMapping(triangulation)
+    tri_glo = tri_glo.astype(int)
+    #tri_glo = triangulation
+    for tri in tri_glo:
+        vertex_values = v_h[tri]
+        integral = 0
+        for i in range(len(quad_weights)):
+            val = 0
+            point = UnitCell.CoordinateTransformation(quad_coor[i,:])
+            for N in range(basis.LocalDOF()):
+                val += v_h[tri[N]] * basis.BasisFunctionValue(N, point)
+            integral += val * quad_weights[i]
+        full_integral += integral
+    return full_integral
+
+folder = 'Coordinate_Quadrature_data'
+coordinates_7 = np.load(os.path.join(folder, 'coordinates_54.npy'))
+weights_7 = np.load(os.path.join(folder, 'weights_54.npy'))
+arcs = [[2, 3], [3, 5], [6, 5], [7, 5], [4, 5], [0, 5], [5, 6], [5, 7], [5, 
+  4], [5, 0], [5, 3], [8, 10], [9, 10], [11, 10], [1, 10], [2, 
+  10], [3, 2], [10, 2], [10, 8], [10, 9], [10, 11], [10, 1], [2, 
+  8], [8, 9], [9, 11], [11, 1], [1, 2], [3, 6], [6, 7], [7, 4], [4, 
+  0], [0, 3], [8, 6], [9, 7], [11, 4], [1, 0], [3, 8], [6, 9], [7, 
+  11], [4, 1], [0, 2], [8, 2], [9, 8], [11, 9], [1, 11], [2, 1], [6, 
+  3], [7, 6], [4, 7], [0, 4], [3, 0], [6, 8], [7, 9], [4, 11], [0, 
+  1], [8, 3], [9, 6], [11, 7], [1, 4], [2, 0]];
+arcpos = [[[2, 1], [3, 1]], [[3, 1], [4, 1]], [[3, 2], [4, 2]], [[3, 3], [4, 
+   3]], [[3, 4], [4, 4]], [[3, 5], [4, 5]], [[4, 1], [3, 2]], [[4, 
+   2], [3, 3]], [[4, 3], [3, 4]], [[4, 4], [3, 5]], [[4, 5], [3, 
+   6]], [[2, 2], [1, 2]], [[2, 3], [1, 3]], [[2, 4], [1, 4]], [[2, 
+   5], [1, 5]], [[2, 6], [1, 6]], [[3, 6], [2, 6]], [[1, 2], [2, 
+   1]], [[1, 3], [2, 2]], [[1, 4], [2, 3]], [[1, 5], [2, 4]], [[1, 
+   6], [2, 5]], [[2, 1], [2, 2]], [[2, 2], [2, 3]], [[2, 3], [2, 
+   4]], [[2, 4], [2, 5]], [[2, 5], [2, 6]], [[3, 1], [3, 2]], [[3, 
+   2], [3, 3]], [[3, 3], [3, 4]], [[3, 4], [3, 5]], [[3, 5], [3, 
+   6]], [[2, 2], [3, 2]], [[2, 3], [3, 3]], [[2, 4], [3, 4]], [[2, 
+   5], [3, 5]], [[3, 1], [2, 2]], [[3, 2], [2, 3]], [[3, 3], [2, 
+   4]], [[3, 4], [2, 5]], [[3, 5], [2, 6]], [[2, 2], [2, 1]], [[2, 
+   3], [2, 2]], [[2, 4], [2, 3]], [[2, 5], [2, 4]], [[2, 6], [2, 
+   5]], [[3, 2], [3, 1]], [[3, 3], [3, 2]], [[3, 4], [3, 3]], [[3, 
+   5], [3, 4]], [[3, 6], [3, 5]], [[3, 2], [2, 2]], [[3, 3], [2, 
+   3]], [[3, 4], [2, 4]], [[3, 5], [2, 5]], [[2, 2], [3, 1]], [[2, 
+   3], [3, 2]], [[2, 4], [3, 3]], [[2, 5], [3, 4]], [[2, 6], [3, 5]]];
+dual_faces = np.array([[6,7,9],[6,9,8],[5,7,6],[7,11,9],[4,7,5],[3,6,8],[2,8,10],[2,3,8],[9,11,10],[8,9,10],[4,11,7],[3,5,6],[1,10,11],[1,2,10],[1,11,4],[0,4,5],[0,1,4],[0,2,1],[0,3,2],[0,5,3]])
+#%%
+#import  FEM.BasisFunctions.BasisFunctions_Quadratic as Basis
+import  FEM.BasisFunctions.BasisFunctions_Linear as Basis
+points = Basis.GlobalDOF(dual_faces)
+p = np.ones(points)
+p[7] = 100
+M_lin, W_lin, b = FEM_Assembly.Assemble(dual_faces, Basis, coordinates_7, weights_7, 'Heat', p, 'dual')
+M_lin = M_lin.toarray(); W_lin = W_lin.toarray()
+u_lin = np.copy(p)
+
+u_old = u_lin
+u_lin_list = []
+
+delta_time = 0.015; steps = 2000
+lin_con = []
+for i in range(steps):        
+    if i == 0 or i == 20:
+        u_lin_list.append(u_old)
+        print(full_integration(u_old, coordinates_7, weights_7, dual_faces, Basis))
+    elif i == 70 or i == 500:
+        u_lin_list.append(u_old)
+        print(full_integration(u_old, coordinates_7, weights_7, dual_faces, Basis))
+    #lin_sys_vec = np.dot(M_array, u_old) - delta_time * np.dot(np.dot(np.linalg.inv(M_array), W_array), u_old) + b*delta_time
+    #lin_sys_vec = np.dot(M_array, u_old) - delta_time * np.dot(W_array, u_old) 
+    lin_sys_vec = np.dot(M_lin, u_old) - delta_time * np.dot(W_lin, u_old) 
+    #lin_sys_vec = M @ u_old - delta_time * W @ u_old + b
+    u_new = np.linalg.lstsq(M_lin, lin_sys_vec)[0]
+    
+    div = np.linalg.norm(u_old-u_new, 2)
+    u_old = np.copy(u_new)  #Setting the heat source term to zero after the first step. 
+    
+    
+    
+    if np.min(u_old) > 0:
+        lin_con.append(np.max(u_old) - np.min(u_old))
+    else:
+        lin_con.append(np.max(u_old))
+
+#%%
+
+import  FEM.BasisFunctions.BasisFunctions_Quadratic as Basis
+points = Basis.GlobalDOF(dual_faces)
+p = np.ones(points)
+p[7] = 100
+p[[12,13,17,19,21]] = 50
+M_quad, W_quad, b = FEM_Assembly.Assemble(dual_faces, Basis, coordinates_7, weights_7, 'Heat', p, 'dual')
+M_quad = M_quad.toarray(); W_quad = W_quad.toarray()
+u_lin = np.copy(p)
+
+u_old = u_lin
+u_quad_list = []
+
+delta_time = 0.015; steps = 2000
+quad_con = []
+for i in range(steps):        
+    if i == 0 or i == 20:
+        u_quad_list.append(u_old)
+        print(full_integration(u_old, coordinates_7, weights_7, dual_faces, Basis))
+    elif i == 70 or i == 500:
+        u_quad_list.append(u_old)
+        print(full_integration(u_old, coordinates_7, weights_7, dual_faces, Basis))
+    #lin_sys_vec = np.dot(M_array, u_old) - delta_time * np.dot(np.dot(np.linalg.inv(M_array), W_array), u_old) + b*delta_time
+    #lin_sys_vec = np.dot(M_array, u_old) - delta_time * np.dot(W_array, u_old) 
+    lin_sys_vec = np.dot(M_quad, u_old) - delta_time * np.dot(W_quad, u_old) 
+    #lin_sys_vec = M @ u_old - delta_time * W @ u_old + b
+    u_new = np.linalg.lstsq(M_quad, lin_sys_vec)[0]
+    
+    div = np.linalg.norm(u_old-u_new, 2)
+    u_old = np.copy(u_new)  #Setting the heat source term to zero after the first step. '''
+    
+
+    if np.min(u_old) > 0:
+        quad_con.append(np.max(u_old) - np.min(u_old))
+    else:
+        quad_con.append(np.max(u_old))
+#%%
+import  FEM.BasisFunctions.BasisFunctions_Linear as Basis
+import FEM.FEM_Assembly as FEM_Assembly
+points = Basis.GlobalDOF(dual_faces)
+p = np.ones(points)
+p[7] = 100
+#p[[12,13,17,19,21]] = 50
+M_lin_cot, W_lin_cot, A_mat, b = FEM_Assembly.Assemble(dual_faces, Basis, coordinates_7, weights_7, 'Heat', p, 'dual')
+M_lin_cot = M_lin_cot.toarray(); W_lin_cot = W_lin_cot.toarray()
+A_mat = A_mat.toarray()
+u_lin = np.copy(p)
+
+u_old = u_lin
+u_lin_cot_list = []
+
+W_lin_cot = np.dot(np.linalg.inv(A_mat), W_lin_cot)
+
+delta_time = 0.015; steps = 2000
+lin_cot_con = []
+for i in range(steps):        
+    if i == 0 or i == 20:
+        u_lin_cot_list.append(u_old)
+        print(full_integration(u_old, coordinates_7, weights_7, dual_faces, Basis))
+    elif i == 70 or i == 500:
+        u_lin_cot_list.append(u_old)
+        print(full_integration(u_old, coordinates_7, weights_7, dual_faces, Basis))
+    #lin_sys_vec = np.dot(M_array, u_old) - delta_time * np.dot(np.dot(np.linalg.inv(M_array), W_array), u_old) + b*delta_time
+    #lin_sys_vec = np.dot(M_array, u_old) - delta_time * np.dot(W_array, u_old) 
+    lin_sys_vec = np.dot(M_lin_cot, u_old) - delta_time * np.dot(W_lin_cot, u_old) 
+    #lin_sys_vec = M @ u_old - delta_time * W @ u_old + b
+    u_new = np.linalg.lstsq(M_lin_cot, lin_sys_vec)[0]
+    
+    div = np.linalg.norm(u_old-u_new, 2)
+    u_old = np.copy(u_new)  #Setting the heat source term to zero after the first step. '''
+    
+    
+    if np.min(u_old) > 0:
+        lin_cot_con.append(np.max(u_old) - np.min(u_old))
+    else:
+        lin_cot_con.append(np.max(u_old))
+
+
+
+#%%#200 takes half a minute
+resolution = 300
+from Plotting import barycentric_animation;     from numpy.ma import masked_array
+from matplotlib import pyplot as plt;     from matplotlib import cm
+import matplotlib;  import matplotlib.gridspec as gridspec;
+fig = plt.figure(constrained_layout=True)
+
+gs = gridspec.GridSpec(4, 3)
+ax1 = plt.subplot(gs[0, 0])
+ax2 = plt.subplot(gs[1,0])
+ax3 = plt.subplot(gs[2,0])
+ax4 = plt.subplot(gs[3,0])
+
+ax5 = plt.subplot(gs[0, 1])
+ax6 = plt.subplot(gs[1,1])
+ax7 = plt.subplot(gs[2,1])
+ax8 = plt.subplot(gs[3,1])
+
+ax9 = plt.subplot(gs[0, 2])
+ax10 = plt.subplot(gs[1,2])
+ax11 = plt.subplot(gs[2,2])
+ax12 = plt.subplot(gs[3,2])
+gs.tight_layout(fig)
+ax_lst = [ax1,ax2,ax3,ax4,ax5,ax6,ax7,ax8,ax9,ax10,ax11,ax12]
+
+u_list = u_lin_list; ind = 0
+import  FEM.BasisFunctions.BasisFunctions_Linear as Basis
+import time
+for i in range(12):
+    t0 = time.time()
+    
+    ax = ax_lst[i]
+    if i == 4:
+        import  FEM.BasisFunctions.BasisFunctions_Quadratic as Basis
+        u_list = np.copy(u_quad_list)
+        ind = 0
+    elif i == 8:
+        import  FEM.BasisFunctions.BasisFunctions_Linear as Basis
+        u_list = u_lin_cot_list
+        ind = 0
+    u = u_list[ind]
+    ind += 1
+    data_trans = barycentric_animation.transformedFromEisenstein(dual_faces, arcs, arcpos)
+    A = barycentric_animation.contineous_rep(data_trans, u, Basis, resolution, dual_faces)
+    A1 = masked_array(A, A == -100)
+    pb = ax.imshow(A1, interpolation='nearest', cmap=cm.inferno, vmin = -20, vmax = 100)
+    ax_lst[i].set_axis_off()
+    
+    
+    
+    t1 = time.time()
+    total = t1-t0
+    print(total/60)
+    
+ax_lst[0].set_title('Iteration 0'); ax_lst[4].set_title('Iteration 0'); ax_lst[8].set_title('Iteration 0')
+ax_lst[1].set_title('Iteration 20'); ax_lst[5].set_title('Iteration 20'); ax_lst[9].set_title('Iteration 20')
+ax_lst[2].set_title('Iteration 70'); ax_lst[6].set_title('Iteration 70'); ax_lst[10].set_title('Iteration 70')
+ax_lst[3].set_title('Iteration 500'); ax_lst[7].set_title('Iteration 500'); ax_lst[11].set_title('Iteration 500')
+
+fig.colorbar(pb, ax=ax_lst)
+  
+plt.show()
+
+
+#%%
+plt.figure()
+#%%
+
+cmap = plt.get_cmap("tab10")
+
+plt.xlabel('Iterations', fontsize=12)
+plt.ylabel('Difference in max. and min. values', fontsize=12)
+
+plt.title('Convergence for Heat Simulations', fontsize=15)
+x = np.linspace(1,2000,2000)
+#plt.plot(x, lin_con, label = r'Linear flat, $N_{dof}=12$', color=cmap(0))
+#plt.plot(x, quad_con, label = r'Quadratic flat, $N_{dof}=42$', color=cmap(1))
+plt.plot(x, lin_cot_con, label = r'Linear curved, $N_{dof}=12$', color=cmap(2))
+
+
+#plt.plot(x, lin_con, label = r'Linear flat, $N_{dof}=42$', color=cmap(0), linestyle = '-')
+#plt.plot(x, quad_con, label = 'Quadratic flat, $N_{dof}=12$', color=cmap(1), linestyle = '-')
+#plt.plot(x, lin_cot_con, label = 'Linear curved, $N_{dof}=42$', color=cmap(2), linestyle = '--')
+
+
+plt.yscale('log')
+plt.xlim([0,500])
+plt.ylim([10**(-2), 100])
+plt.legend()
+#%%
